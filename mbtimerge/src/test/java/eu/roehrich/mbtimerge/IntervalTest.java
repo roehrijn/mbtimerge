@@ -4,7 +4,22 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class IntervalTest {
+public class IntervalTest {
+
+    @Test
+    void constructor_withValuesOutOfRange() {
+        assertDoesNotThrow(() -> new Interval(Interval.MIN_VALUE, 0));
+        assertDoesNotThrow(() -> new Interval(0, Interval.MAX_VALUE));
+        assertThrows(IllegalArgumentException.class, () -> new Interval(Interval.MIN_VALUE-1, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Interval(0, Interval.MAX_VALUE+1));
+    }
+
+    @Test
+    void constructor_withBeginNotSmallerThanEnd() {
+        assertThrows(IllegalArgumentException.class, () -> new Interval(6, 5));
+        assertThrows(IllegalArgumentException.class, () -> new Interval(0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Interval(-4, -5));
+    }
 
     @Test
     void compareTo() {

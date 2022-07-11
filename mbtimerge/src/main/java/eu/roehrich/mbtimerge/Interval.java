@@ -7,6 +7,9 @@ import java.util.Objects;
  */
 public final class Interval implements Comparable<Interval> {
 
+    public static final int MAX_VALUE = 1073741823;
+    public static final int MIN_VALUE = -1073741824;
+
     private final Integer begin;
 
     private final Integer end;
@@ -19,6 +22,13 @@ public final class Interval implements Comparable<Interval> {
         if(begin >= end) {
             throw new IllegalArgumentException(String.format("begin < end required, but got [%d, %d]", begin, end));
         }
+        if(begin > MAX_VALUE || begin < MIN_VALUE) {
+            throw new IllegalArgumentException(String.format("%d <= begin <= %d required, but got %d", MIN_VALUE, MAX_VALUE, begin));
+        }
+        if(end > MAX_VALUE || end < MIN_VALUE) {
+            throw new IllegalArgumentException(String.format("%d <= end <= %d required, but got %d", MIN_VALUE, MAX_VALUE, end));
+        }
+
         this.begin = begin;
         this.end = end;
     }

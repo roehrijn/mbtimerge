@@ -1,12 +1,15 @@
 package eu.roehrich.mbtimerge;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
  * Merges the intervals given as a collection of @{@link Interval}s according to the specification
  * of https://docs.google.com/document/d/1FS272sy-boGQ49TBFKirIbn5YLasZi1XcyAq5NZ2uBI/edit?usp=sharing
- * using a brute force algorithm, explained in {@link #doMerge(Collection)}
+ * using a brute force algorithm, explained in {@link #doMerge(List)}
  *
  * Expected memory footprint:
  * The collection of input intervals is copied as a first step. Algorithm needs approx. twice the
@@ -21,14 +24,14 @@ import java.util.concurrent.ConcurrentSkipListSet;
  */
 public class BruteForceMerge {
 
-    enum CompareResult {
-        FIRST_IN_SECOND,
-        SECOND_IN_FIRST,
-        EQUALS,
-        OVERLAP_ABOVE_FIRST,
-        OVERLAP_BELOW_FIRST,
-        DISJUNCT
-    }
+    private static final Logger LOGGER = LoggerFactory.getLogger(BruteForceMerge.class);
+
+    static final IntervalComparator INTERVAL_COMPARATOR = new IntervalComparator();
+
+    /**
+     * The biggest possible input collection count (only exemplary value)
+     */
+    static final int INPUT_TOO_BIG_THRESHOLD = 10000;
 
     /**
      * Compare every interval with every other interval and merge if the combination is subject to be merged.
@@ -37,8 +40,16 @@ public class BruteForceMerge {
      * @param input The intervals to process (not modified)
      * @return the merged intervals
      */
-    public static Collection<Interval> doMerge(final Collection<Interval> input) {
+    public static Collection<Interval> doMerge(final List<Interval> input) {
 
+        if(input.size() > INPUT_TOO_BIG_THRESHOLD) {
+            throw new IllegalArgumentException(String.format("Input size must no exceed %d but is: %d", INPUT_TOO_BIG_THRESHOLD, input.size()));
+        }
+
+        LOGGER.debug("Computing merged intervals of input: {}...", input.subList(0, Math.min(input.size(), 50))); // TODO: would be much more efficient to decorate the list with an alternative toString implementation.
+
+        // concurrency aware Set implementation is needed otherwise the two competing iterators in the outer and inner loop
+        // would cause mutual @java.util.ConcurrentModificationException when deleting or inserting objects
         var result = new ConcurrentSkipListSet<Interval>(input);
 
         boolean somethingChanged;
@@ -52,64 +63,25 @@ public class BruteForceMerge {
                 while (secondIter.hasNext()) {
                     var second = secondIter.next();
 
-                    var compareResult = compare(first, second);
-                    if (compareResult == CompareResult.SECOND_IN_FIRST) {
+                    var compareResult = INTERVAL_COMPARATOR.compare(first, second);
+                    if (compareResult == IntervalComparator.CompareResult.SECOND_IN_FIRST) {
                         somethingChanged = true;
                         secondIter.remove();
-                    } else if (compareResult == CompareResult.FIRST_IN_SECOND) {
+                    } else if (compareResult == IntervalComparator.CompareResult.FIRST_IN_SECOND) {
                         somethingChanged = true;
                         firstIter.remove();
                         break; // this break just reduces CPU cycles. It does not break the algorithm in case it is removed.
-                    } else if (compareResult == CompareResult.OVERLAP_ABOVE_FIRST) {
+                    } else if (compareResult == IntervalComparator.CompareResult.OVERLAP_ABOVE_FIRST) {
                         somethingChanged = true;
                         result.add(Interval.of(first.getBegin(), second.getEnd()));
-                    } else if (compareResult == CompareResult.OVERLAP_BELOW_FIRST) {
+                    } else if (compareResult == IntervalComparator.CompareResult.OVERLAP_BELOW_FIRST) {
                         somethingChanged = true;
                         result.add(Interval.of(second.getBegin(), first.getEnd()));
                     }
                 }
             }
         } while (somethingChanged);
+        LOGGER.info("Merge finished successfully.\nInput: {}...\nResult: {}", input.subList(0, Math.min(input.size(), 50)), result);
         return result;
     }
-
-    // Assumption: Touching intervals are considered as overlapping
-    static CompareResult compare(Interval first, Interval second) {
-        if(first == second || first.equals(second)) {
-            return CompareResult.EQUALS;
-        }
-        // first:   |--------|
-        // second:               |--------------|
-        if(first.getEnd() < second.getBegin()) {
-            return CompareResult.DISJUNCT;
-        }
-        // first:                        |--------|
-        // second:    |--------------|
-        if(first.getBegin() > second.getEnd()) {
-            return CompareResult.DISJUNCT;
-        }
-        // first:   |---------------|
-        // second:    |----------|
-        if(first.getBegin() <= second.getBegin() && first.getEnd() >= second.getEnd()) {
-            return CompareResult.SECOND_IN_FIRST;
-        }
-        // first:      |-------|
-        // second:    |----------|
-        if(first.getBegin() >= second.getBegin() && first.getEnd() <= second.getEnd()) {
-            return CompareResult.FIRST_IN_SECOND;
-        }
-        // first:   |--------|
-        // second:       |--------------|
-        if(second.getBegin() >= first.getBegin() && second.getBegin() <= first.getEnd() && second.getEnd() > first.getEnd()) {
-            return CompareResult.OVERLAP_ABOVE_FIRST;
-        }
-        // first:                    |--------|
-        // second:       |--------------|
-        if(second.getEnd() >= first.getBegin() && second.getEnd() <= first.getEnd() && second.getBegin() < first.getBegin()) {
-            return CompareResult.OVERLAP_BELOW_FIRST;
-        }
-        throw new IllegalStateException(String.format("Execution should never reach this line. First: %s, Second: %s", first, second));
-    }
-
-
 }
