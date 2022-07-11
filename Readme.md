@@ -27,7 +27,7 @@ With some drawbacks it would also be possible to implement a recursive algorithm
 ## Run
 
 1. Checkout Git repository
-2. Compile (you need to have Maven 3.x and Java 17 installed): `mvn compile`
+2. Compile (you need to have Maven 3.x and Java 12+ installed): `mvn compile`
 3. Execution of the tests (this executes the example): `mvn verify`
 
 ## Additional questions 
